@@ -1,5 +1,6 @@
 import type { ExtensionAPI, ExtensionContext, ToolInfo } from "@mariozechner/pi-coding-agent";
 import type { McpExtensionState } from "./state.js";
+import { Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { showStatus, showTools, reconnectServers, authenticateServer, openMcpPanel } from "./commands.js";
 import { loadMcpConfig } from "./config.js";
@@ -34,6 +35,19 @@ export default function mcpAdapter(pi: ExtensionAPI) {
       label: `MCP: ${spec.originalName}`,
       description: spec.description || "(no description)",
       parameters: Type.Unsafe<Record<string, unknown>>(spec.inputSchema || { type: "object", properties: {} }),
+      renderCall(args: Record<string, unknown>, theme: { fg: (color: string, text: string) => string; bold: (text: string) => string }) {
+        let text = theme.fg("toolTitle", theme.bold(spec.originalName));
+        if (args && typeof args === "object") {
+          const entries = Object.entries(args);
+          if (entries.length > 0) {
+            const summary = entries
+              .map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
+              .join(", ");
+            text += " " + theme.fg("muted", `{ ${summary} }`);
+          }
+        }
+        return new Text(text, 0, 0);
+      },
       execute: createDirectToolExecutor(() => state, () => initPromise, spec),
     });
   }
@@ -159,6 +173,39 @@ export default function mcpAdapter(pi: ExtensionAPI) {
       server: Type.Optional(Type.String({ description: "Filter to specific server (also disambiguates tool calls)" })),
       action: Type.Optional(Type.String({ description: "Action: 'ui-messages' to retrieve prompts/intents from UI sessions" })),
     }),
+    renderCall(args: Record<string, unknown>, theme: { fg: (color: string, text: string) => string; bold: (text: string) => string }) {
+      let text = theme.fg("toolTitle", theme.bold("mcp"));
+      if (args.tool) {
+        text += " " + theme.fg("accent", String(args.tool));
+        if (args.args) {
+          try {
+            const parsed = JSON.parse(String(args.args));
+            const summary = Object.entries(parsed)
+              .map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
+              .join(", ");
+            text += " " + theme.fg("muted", `{ ${summary} }`);
+          } catch {
+            text += " " + theme.fg("muted", String(args.args));
+          }
+        }
+        if (args.server) {
+          text += theme.fg("muted", ` (${args.server})`);
+        }
+      } else if (args.connect) {
+        text += " " + theme.fg("accent", "connect") + " " + theme.fg("muted", String(args.connect));
+      } else if (args.describe) {
+        text += " " + theme.fg("accent", "describe") + " " + theme.fg("muted", String(args.describe));
+      } else if (args.search) {
+        text += " " + theme.fg("accent", "search") + " " + theme.fg("muted", `"${args.search}"`);
+      } else if (args.server) {
+        text += " " + theme.fg("accent", "list") + " " + theme.fg("muted", String(args.server));
+      } else if (args.action) {
+        text += " " + theme.fg("accent", String(args.action));
+      } else {
+        text += " " + theme.fg("accent", "status");
+      }
+      return new Text(text, 0, 0);
+    },
     async execute(_toolCallId, params: {
       tool?: string;
       args?: string;
