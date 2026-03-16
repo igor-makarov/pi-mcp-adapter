@@ -169,7 +169,7 @@ export default function mcpAdapter(pi: ExtensionAPI) {
       includeSchemas?: boolean;
       server?: string;
       action?: string;
-    }, _signal, _onUpdate, _ctx) {
+    }, signal, _onUpdate, _ctx) {
       let parsedArgs: Record<string, unknown> | undefined;
       if (params.args) {
         try {
@@ -212,7 +212,7 @@ export default function mcpAdapter(pi: ExtensionAPI) {
         return executeUiMessages(state);
       }
       if (params.tool) {
-        return executeCall(state, params.tool, parsedArgs, params.server);
+        return executeCall(state, params.tool, parsedArgs, params.server, signal);
       }
       if (params.connect) {
         return executeConnect(state, params.connect);
