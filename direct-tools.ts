@@ -175,6 +175,14 @@ export function createDirectToolExecutor(
   spec: DirectToolSpec
 ): DirectToolExecute {
   return async function execute(_toolCallId, params, signal) {
+    // Extract and strip timeout before sending params to MCP server
+    const timeoutSec = params?.timeout as number | undefined;
+    const timeout = timeoutSec ? timeoutSec * 1000 : undefined;
+    if (params && "timeout" in params) {
+      const { timeout: _, ...rest } = params;
+      params = rest;
+    }
+
     let state = getState();
     const initPromise = getInitPromise();
 
@@ -219,7 +227,7 @@ export function createDirectToolExecutor(
       state.manager.incrementInFlight(spec.serverName);
 
       if (spec.resourceUri) {
-        const result = await connection.client.readResource({ uri: spec.resourceUri }, { signal });
+        const result = await connection.client.readResource({ uri: spec.resourceUri }, { signal, timeout });
         const content = (result.contents ?? []).map(c => ({
           type: "text" as const,
           text: "text" in c ? c.text : ("blob" in c ? `[Binary data: ${(c as { mimeType?: string }).mimeType ?? "unknown"}]` : JSON.stringify(c)),
@@ -245,7 +253,7 @@ export function createDirectToolExecutor(
         name: spec.originalName,
         arguments: params ?? {},
         _meta: uiSession?.requestMeta,
-      }, undefined, { signal });
+      }, undefined, { signal, timeout });
 
       const result = await resultPromise;
       uiSession?.sendToolResult(result as unknown as import("@modelcontextprotocol/sdk/types.js").CallToolResult);

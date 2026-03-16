@@ -51,14 +51,18 @@ export function renderDirectCall(
   theme: Theme,
 ) {
   let text = theme.fg("toolTitle", theme.bold(originalName));
+  const timeout = args?.timeout;
   if (args && typeof args === "object") {
-    const entries = Object.entries(args);
+    const entries = Object.entries(args).filter(([k]) => k !== "timeout");
     if (entries.length > 0) {
       const summary = entries
         .map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
         .join(", ");
       text += " " + theme.fg("muted", `{ ${summary} }`);
     }
+  }
+  if (timeout) {
+    text += theme.fg("muted", ` (timeout ${timeout}s)`);
   }
   return new Text(text, 0, 0);
 }

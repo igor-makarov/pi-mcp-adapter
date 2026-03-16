@@ -30,11 +30,19 @@ export default function mcpAdapter(pi: ExtensionAPI) {
       );
 
   for (const spec of directSpecs) {
+    const baseSchema = spec.inputSchema || { type: "object", properties: {} };
+    const schemaWithTimeout = {
+      ...baseSchema,
+      properties: {
+        ...(baseSchema as Record<string, unknown>).properties as Record<string, unknown>,
+        timeout: { type: "number", description: "Timeout in seconds for this tool call (default: 60)" },
+      },
+    };
     pi.registerTool({
       name: spec.prefixedName,
       label: `MCP: ${spec.originalName}`,
       description: spec.description || "(no description)",
-      parameters: Type.Unsafe<Record<string, unknown>>(spec.inputSchema || { type: "object", properties: {} }),
+      parameters: Type.Unsafe<Record<string, unknown>>(schemaWithTimeout),
       renderCall: (args: Record<string, unknown>, theme: Parameters<typeof renderDirectCall>[2]) =>
         renderDirectCall(spec.originalName, args, theme),
       renderResult: renderResult,
