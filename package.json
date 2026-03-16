@@ -49,6 +49,7 @@
     "ui-stream-types.ts",
     "config.ts",
     "server-manager.ts",
+    "render.ts",
     "tool-registrar.ts",
     "resource-tools.ts",
     "lifecycle.ts",
