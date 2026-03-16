@@ -44,7 +44,7 @@ export default function mcpAdapter(pi: ExtensionAPI) {
       description: spec.description || "(no description)",
       parameters: Type.Unsafe<Record<string, unknown>>(schemaWithTimeout),
       renderCall: (args: Record<string, unknown>, theme: Parameters<typeof renderDirectCall>[2]) =>
-        renderDirectCall(spec.originalName, args, theme),
+        renderDirectCall(spec.prefixedName, args, theme),
       renderResult: renderResult,
       execute: createDirectToolExecutor(() => state, () => initPromise, spec),
     });
