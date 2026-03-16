@@ -23,6 +23,9 @@ export function renderProxyCall(
         text += " " + theme.fg("muted", String(args.args));
       }
     }
+    if (args.timeout) {
+      text += theme.fg("muted", ` (timeout ${args.timeout}s)`);
+    }
     if (args.server) {
       text += theme.fg("muted", ` (${args.server})`);
     }
