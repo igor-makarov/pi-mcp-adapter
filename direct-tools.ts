@@ -7,6 +7,7 @@ import { isServerCacheValid } from "./metadata-cache.js";
 import { formatSchema } from "./tool-metadata.js";
 import { transformMcpContent } from "./tool-registrar.js";
 import { maybeStartUiSession, type UiSessionRuntime } from "./ui-session.js";
+import { truncateToolResult } from "./output-truncation.js";
 import { formatToolName } from "./types.js";
 import { resourceNameToToolName } from "./resource-tools.js";
 
@@ -232,10 +233,10 @@ export function createDirectToolExecutor(
           type: "text" as const,
           text: "text" in c ? c.text : ("blob" in c ? `[Binary data: ${(c as { mimeType?: string }).mimeType ?? "unknown"}]` : JSON.stringify(c)),
         }));
-        return {
+        return truncateToolResult({
           content: content.length > 0 ? content : [{ type: "text" as const, text: "(empty resource)" }],
           details: { server: spec.serverName, resourceUri: spec.resourceUri },
-        };
+        }, { prefix: "pi-mcp" });
       }
 
       const hasUi = !!spec.uiResourceUri;
@@ -266,10 +267,10 @@ export function createDirectToolExecutor(
         if (spec.inputSchema) {
           errorText += `\n\nExpected parameters:\n${formatSchema(spec.inputSchema)}`;
         }
-        return {
+        return truncateToolResult({
           content: [{ type: "text" as const, text: `Error: ${errorText}` }],
           details: { error: "tool_error", server: spec.serverName },
-        };
+        }, { prefix: "pi-mcp" });
       }
 
       const resultText = content.filter(c => c.type === "text").map(c => (c as { text: string }).text).join("\n") || "(empty result)";
@@ -277,16 +278,16 @@ export function createDirectToolExecutor(
         const uiMessage = uiSession?.reused
           ? "Updated the open UI."
           : "📺 Interactive UI is now open in your browser. I'll respond to your prompts and intents as you interact with it.";
-        return {
+        return truncateToolResult({
           content: [{ type: "text" as const, text: `${resultText}\n\n${uiMessage}` }],
           details: { server: spec.serverName, tool: spec.originalName, uiOpen: true },
-        };
+        }, { prefix: "pi-mcp" });
       }
 
-      return {
+      return truncateToolResult({
         content: content.length > 0 ? content : [{ type: "text" as const, text: "(empty result)" }],
         details: { server: spec.serverName, tool: spec.originalName },
-      };
+      }, { prefix: "pi-mcp" });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       uiSession?.sendToolCancelled(message);
@@ -294,10 +295,10 @@ export function createDirectToolExecutor(
       if (spec.inputSchema) {
         errorText += `\n\nExpected parameters:\n${formatSchema(spec.inputSchema)}`;
       }
-      return {
+      return truncateToolResult({
         content: [{ type: "text" as const, text: errorText }],
         details: { error: "call_failed", server: spec.serverName },
-      };
+      }, { prefix: "pi-mcp" });
     } finally {
       if (uiSession?.reused) {
         uiSession.close();

@@ -6,6 +6,7 @@ import { lazyConnect, updateServerMetadata, updateMetadataCache, getFailureAgeSe
 import { buildToolMetadata, getToolNames, findToolByName, formatSchema } from "./tool-metadata.js";
 import { transformMcpContent } from "./tool-registrar.js";
 import { maybeStartUiSession, type UiSessionRuntime } from "./ui-session.js";
+import { truncateToolResult } from "./output-truncation.js";
 import { truncateAtWord } from "./utils.js";
 
 type ProxyToolResult = AgentToolResult<Record<string, unknown>>;
@@ -534,10 +535,10 @@ export async function executeCall(
         type: "text" as const,
         text: "text" in c ? c.text : ("blob" in c ? `[Binary data: ${(c as { mimeType?: string }).mimeType ?? "unknown"}]` : JSON.stringify(c)),
       }));
-      return {
+      return truncateToolResult({
         content: content.length > 0 ? content : [{ type: "text" as const, text: "(empty resource)" }],
         details: { mode: "call", resourceUri: toolMeta.resourceUri, server: serverName },
-      };
+      }, { prefix: "pi-mcp" });
     }
 
     uiSession = toolMeta.uiResourceUri
@@ -572,20 +573,20 @@ export async function executeCall(
         if (toolMeta.inputSchema) {
           errorWithSchema += `\n\nExpected parameters:\n${formatSchema(toolMeta.inputSchema)}`;
         }
-        return {
+        return truncateToolResult({
           content: [{ type: "text" as const, text: errorWithSchema }],
           details: { mode: "call", error: "tool_error", mcpResult: result },
-        };
+        }, { prefix: "pi-mcp" });
       }
 
       const resultText = mcpText || "(empty result)";
       const uiMessage = uiSession?.reused
         ? "Updated the open UI."
         : "📺 Interactive UI is now open in your browser. I'll respond to your prompts and intents as you interact with it.";
-      return {
+      return truncateToolResult({
         content: [{ type: "text" as const, text: `${resultText}\n\n${uiMessage}` }],
         details: { mode: "call", mcpResult: result, server: serverName, tool: toolMeta.originalName, uiOpen: true },
-      };
+      }, { prefix: "pi-mcp" });
     }
 
     const result = await resultPromise;
@@ -604,16 +605,16 @@ export async function executeCall(
         errorWithSchema += `\n\nExpected parameters:\n${formatSchema(toolMeta.inputSchema)}`;
       }
 
-      return {
+      return truncateToolResult({
         content: [{ type: "text" as const, text: errorWithSchema }],
         details: { mode: "call", error: "tool_error", mcpResult: result },
-      };
+      }, { prefix: "pi-mcp" });
     }
 
-    return {
+    return truncateToolResult({
       content: content.length > 0 ? content : [{ type: "text" as const, text: "(empty result)" }],
       details: { mode: "call", mcpResult: result, server: serverName, tool: toolMeta.originalName },
-    };
+    }, { prefix: "pi-mcp" });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     uiSession?.sendToolCancelled(message);
@@ -623,10 +624,10 @@ export async function executeCall(
       errorWithSchema += `\n\nExpected parameters:\n${formatSchema(toolMeta.inputSchema)}`;
     }
 
-    return {
+    return truncateToolResult({
       content: [{ type: "text" as const, text: errorWithSchema }],
       details: { mode: "call", error: "call_failed", message },
-    };
+    }, { prefix: "pi-mcp" });
   } finally {
     if (uiSession?.reused) {
       uiSession.close();

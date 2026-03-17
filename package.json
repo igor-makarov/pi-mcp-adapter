@@ -50,6 +50,7 @@
     "config.ts",
     "server-manager.ts",
     "render.ts",
+    "output-truncation.ts",
     "tool-registrar.ts",
     "resource-tools.ts",
     "lifecycle.ts",
