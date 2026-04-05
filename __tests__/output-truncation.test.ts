@@ -4,8 +4,8 @@ import {
   DEFAULT_MAX_BYTES,
   DEFAULT_MAX_LINES,
   truncateTail,
-  truncateToolResult,
-} from "../output-truncation.js";
+} from "@mariozechner/pi-coding-agent";
+import { truncateToolResult } from "../output-truncation.js";
 
 describe("output truncation", () => {
   const testTmpDir = "/tmp/pi/pi-mcp-adapter-tests";
