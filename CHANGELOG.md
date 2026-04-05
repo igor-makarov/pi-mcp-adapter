@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.2] - 2026-04-03
+
+### Fixed
+- Session lifecycle teardown now handles repeated `session_start` transitions safely and prevents stale async init results from replacing newer state.
+- Shutdown now still runs `gracefulShutdown()` even if metadata cache flushing throws, avoiding leaked MCP processes.
+- Proxy/direct tool init error paths now preserve and surface underlying error messages instead of returning generic failures.
+- Invalid `mcp` tool `args` now fail by throwing with parse/type context instead of returning non-failing tool payloads.
+- Added focused lifecycle regressions tests for stale init cleanup and init-error visibility.
+
+## [2.2.1] - 2026-03-23
+
+### Fixed
+- Added `promptSnippet` to MCP proxy tool and direct MCP tools so they appear in the system prompt's Available tools section (required since pi 0.59.0)
+
 ## [2.2.0] - 2026-03-16
 
 ### Added
