@@ -39,8 +39,6 @@ export function renderProxyCall(
     text += " " + theme.fg("accent", "list") + " " + theme.fg("muted", String(args.server));
   } else if (args.action) {
     text += " " + theme.fg("accent", String(args.action));
-  } else {
-    text += " " + theme.fg("accent", "status");
   }
   return new Text(text, 0, 0);
 }
