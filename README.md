@@ -291,6 +291,4 @@ Tool names are fuzzy-matched on hyphens and underscores — `context7_resolve_li
 
 ## Limitations
 
-- OAuth tokens obtained externally (no browser flow)
-- No automatic token refresh
 - Cross-session server sharing not yet implemented (each Pi session runs its own server processes)
