@@ -16,7 +16,11 @@ type AutoAuthResult =
   | { status: "success" }
   | { status: "failed"; message: string };
 
-function getAuthRequiredMessage(serverName: string): string {
+function getAuthRequiredMessage(state: McpExtensionState, serverName: string): string {
+  const template = state.config.settings?.authRequiredMessage;
+  if (template) {
+    return template.replaceAll("${server}", serverName);
+  }
   return `Server "${serverName}" requires OAuth authentication. Run /mcp-auth ${serverName} first.`;
 }
 
@@ -433,7 +437,7 @@ export async function executeConnect(state: McpExtensionState, serverName: strin
         connection = await state.manager.connect(serverName, definition);
       }
       if (connection.status === "needs-auth") {
-        const message = getAuthRequiredMessage(serverName);
+        const message = getAuthRequiredMessage(state, serverName);
         return {
           content: [{ type: "text" as const, text: message }],
           details: { mode: "connect", error: "auth_required", server: serverName, message },
@@ -522,7 +526,7 @@ export async function executeCall(
         }
 
         if (!toolMeta && state.manager.getConnection(serverName)?.status === "needs-auth") {
-          const message = getAuthRequiredMessage(serverName);
+          const message = getAuthRequiredMessage(state, serverName);
           return {
             content: [{ type: "text" as const, text: message }],
             details: { mode: "call", error: "auth_required", server: serverName, message },
@@ -616,7 +620,7 @@ export async function executeCall(
     }
 
     if (connection?.status === "needs-auth") {
-      const message = getAuthRequiredMessage(serverName);
+      const message = getAuthRequiredMessage(state, serverName);
       return {
         content: [{ type: "text" as const, text: message }],
         details: { mode: "call", error: "auth_required", server: serverName, message },
@@ -662,7 +666,7 @@ export async function executeCall(
         }
 
         if (connection.status === "needs-auth") {
-          const message = getAuthRequiredMessage(serverName);
+          const message = getAuthRequiredMessage(state, serverName);
           return {
             content: [{ type: "text" as const, text: message }],
             details: { mode: "call", error: "auth_required", server: serverName, message },

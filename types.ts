@@ -318,6 +318,12 @@ export interface McpSettings {
   directTools?: boolean;
   disableProxyTool?: boolean;
   autoAuth?: boolean;
+  /**
+   * Message returned in tool results when a server needs (re-)authentication.
+   * "${server}" is substituted with the server name. Defaults to a TUI
+   * instruction when unset.
+   */
+  authRequiredMessage?: string;
 }
 
 // Root config
