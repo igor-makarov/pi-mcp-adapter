@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Applied `settings.authRequiredMessage` to proxy and direct-tool auth-required paths, including non-UI `autoAuth` failures.
+- Fixed `/mcp-auth <server>` reporting success for expired stored OAuth tokens without forcing the SDK refresh/re-auth flow.
 
 ## [2.4.2] - 2026-04-22
 

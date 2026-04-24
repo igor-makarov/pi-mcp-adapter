@@ -2,14 +2,13 @@
  * MCP Auth Flow
  * 
  * High-level OAuth flow management using the MCP SDK's built-in auth functions.
- * Follows the OpenCode pattern: let the SDK handle discovery internally via transport.
  */
 
 import {
+  auth as runSdkAuth,
   UnauthorizedError,
 } from "@modelcontextprotocol/sdk/client/auth.js"
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
-import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import open from "open"
 import { McpOAuthProvider, type McpOAuthConfig } from "./mcp-oauth-provider.js"
 import {
@@ -66,18 +65,13 @@ function extractOAuthConfig(definition: ServerEntry): McpOAuthConfig {
 
 /**
  * Start OAuth authentication flow for a server.
- * Returns the authorization URL that should be opened in a browser.
- * 
- * This follows the OpenCode pattern:
- * 1. Create transport with auth provider
- * 2. Try to connect - SDK handles discovery internally
- * 3. If UnauthorizedError, capture the auth URL from onRedirect
+ * Returns the authorization URL when browser authorization is required.
  */
 export async function startAuth(
   serverName: string,
   serverUrl: string,
   definition?: ServerEntry
-): Promise<{ authorizationUrl: string; transport: StreamableHTTPClientTransport }> {
+): Promise<{ authorizationUrl: string }> {
   const config = definition ? extractOAuthConfig(definition) : {}
 
   if (config.grantType === "client_credentials") {
@@ -86,33 +80,20 @@ export async function startAuth(
         throw new Error("Browser redirect is not used for client_credentials flow")
       },
     })
-    const transport = new StreamableHTTPClientTransport(new URL(serverUrl), {
-      authProvider,
-    })
-    const client = new Client({
-      name: "pi-mcp",
-      version: "3.0.0",
-    })
-
-    try {
-      await client.connect(transport)
-      return { authorizationUrl: "", transport }
-    } finally {
-      await client.close().catch(() => {})
-      await transport.close().catch(() => {})
+    const result = await runSdkAuth(authProvider, { serverUrl })
+    if (result !== "AUTHORIZED") {
+      throw new UnauthorizedError("Failed to authorize")
     }
+    return { authorizationUrl: "" }
   }
 
   // Start the callback server.
   // Pre-registered OAuth clients require an exact redirect URI, so enforce strict port binding.
   await ensureCallbackServer({ strictPort: Boolean(config.clientId) })
 
-  // Generate and store OAuth state BEFORE creating the provider
-  // The SDK will call provider.state() to read this value
   const oauthState = generateState()
   await updateOAuthState(serverName, oauthState)
 
-  // Create the auth provider
   let capturedUrl: URL | undefined
   const authProvider = new McpOAuthProvider(serverName, serverUrl, config, {
     onRedirect: async (url) => {
@@ -120,32 +101,22 @@ export async function startAuth(
     },
   })
 
-  // Create transport with auth provider
-  // The SDK handles OAuth discovery internally when connecting
-  const transport = new StreamableHTTPClientTransport(new URL(serverUrl), {
-    authProvider,
-  })
-  const client = new Client({
-    name: "pi-mcp",
-    version: "3.0.0",
-  })
-
-  // Try to connect - this triggers the OAuth flow
   try {
-    await client.connect(transport)
-    // If we get here, we're already authenticated
-    await client.close().catch(() => {})
-    await transport.close().catch(() => {})
-    return { authorizationUrl: "", transport }
-  } catch (error) {
-    if (error instanceof UnauthorizedError && capturedUrl) {
-      await client.close().catch(() => {})
-      // Store transport for later finishAuth
-      pendingTransports.set(serverName, transport)
-      return { authorizationUrl: capturedUrl.toString(), transport }
+    const result = await runSdkAuth(authProvider, { serverUrl })
+    if (result === "AUTHORIZED") {
+      await clearOAuthState(serverName)
+      return { authorizationUrl: "" }
     }
-    await client.close().catch(() => {})
-    await transport.close().catch(() => {})
+    if (!capturedUrl) {
+      throw new UnauthorizedError("OAuth authorization URL was not provided")
+    }
+    pendingTransports.set(
+      serverName,
+      new StreamableHTTPClientTransport(new URL(serverUrl), { authProvider }),
+    )
+    return { authorizationUrl: capturedUrl.toString() }
+  } catch (error) {
+    await clearOAuthState(serverName)
     throw error
   }
 }
@@ -208,19 +179,19 @@ export async function authenticate(
     // Register the callback BEFORE opening the browser
     const callbackPromise = waitForCallback(oauthState)
 
-    // Open browser
-    console.log(`MCP Auth: Opening browser for ${serverName}`)
     try {
-      await open(authorizationUrl)
-    } catch (error) {
-      console.warn(`MCP Auth: Failed to open browser for ${serverName}`, { error })
-      throw new Error(
-        `Could not open browser. Please open this URL manually: ${authorizationUrl}`,
-        { cause: error },
-      )
-    }
+      // Open browser
+      console.log(`MCP Auth: Opening browser for ${serverName}`)
+      try {
+        await open(authorizationUrl)
+      } catch (error) {
+        console.warn(`MCP Auth: Failed to open browser for ${serverName}`, { error })
+        throw new Error(
+          `Could not open browser. Please open this URL manually: ${authorizationUrl}`,
+          { cause: error },
+        )
+      }
 
-    try {
       // Wait for callback
       const code = await callbackPromise
 
@@ -236,6 +207,7 @@ export async function authenticate(
       return await completeAuth(serverName, code)
     } catch (error) {
       cancelPendingCallback(oauthState)
+      await clearOAuthState(serverName)
       const pendingTransport = pendingTransports.get(serverName)
       if (pendingTransport) {
         pendingTransports.delete(serverName)
@@ -295,31 +267,12 @@ export async function getValidToken(
         return null
       }
 
-      // Try to get tokens to find the token endpoint
-      const existingTokens = await authProvider.tokens()
-      if (!existingTokens) {
+      const result = await runSdkAuth(authProvider, { serverUrl })
+      if (result !== "AUTHORIZED") {
         return null
       }
-
-      // Create transport to trigger refresh
-      const transport = new StreamableHTTPClientTransport(new URL(serverUrl), {
-        authProvider,
-      })
-
-      // Try to connect - SDK will attempt token refresh internally
-      const client = new Client({ name: "pi-mcp", version: "3.0.0" })
-      try {
-        await client.connect(transport)
-        // Get refreshed tokens
-        const refreshed = await getAuthForUrl(serverName, serverUrl)
-        return refreshed?.tokens ?? null
-      } catch (error) {
-        console.error(`MCP Auth: Token refresh failed for ${serverName}`, { error })
-        return null
-      } finally {
-        await client.close().catch(() => {})
-        await transport.close().catch(() => {})
-      }
+      const refreshed = await getAuthForUrl(serverName, serverUrl)
+      return refreshed?.tokens ?? null
     } catch (error) {
       console.error(`MCP Auth: Token refresh failed for ${serverName}`, { error })
       return null
