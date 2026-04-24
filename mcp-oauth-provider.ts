@@ -6,6 +6,7 @@
  */
 
 import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js"
+import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js"
 import type {
   OAuthClientMetadata,
   OAuthTokens,
@@ -200,10 +201,22 @@ export class McpOAuthProvider implements OAuthClientProvider {
   /**
    * Redirect the user to the authorization URL.
    * This opens the browser for the user to authenticate.
+   *
+   * Throws UnauthorizedError when called outside of a user-initiated flow
+   * (no oauthState saved by startAuth). That path is reached when the SDK
+   * falls through from a failed refresh into a fresh authorization_code
+   * flow, which library hosts cannot complete in-process.
    */
   async redirectToAuthorization(authorizationUrl: URL): Promise<void> {
     if (this.usesClientCredentials) {
       throw new Error("redirectToAuthorization is not used for client_credentials flow")
+    }
+    // No saved oauthState means we're on the post-refresh authorize fallback.
+    const entry = await getAuthEntry(this.serverName)
+    if (!entry?.oauthState) {
+      throw new UnauthorizedError(
+        `Re-authentication required for MCP server: ${this.serverName}`,
+      )
     }
     // URL is passed to callback, not logged (may contain sensitive params)
     await this.callbacks.onRedirect(authorizationUrl)
@@ -240,7 +253,7 @@ export class McpOAuthProvider implements OAuthClientProvider {
 
   /**
    * Get the stored OAuth state parameter.
-   * @throws Error if no state is stored
+   * @throws UnauthorizedError if no flow is in progress (see redirectToAuthorization)
    */
   async state(): Promise<string> {
     if (this.usesClientCredentials) {
@@ -248,7 +261,9 @@ export class McpOAuthProvider implements OAuthClientProvider {
     }
     const entry = await getAuthEntry(this.serverName)
     if (!entry?.oauthState) {
-      throw new Error(`No OAuth state saved for MCP server: ${this.serverName}`)
+      throw new UnauthorizedError(
+        `Re-authentication required for MCP server: ${this.serverName}`,
+      )
     }
     return entry.oauthState
   }

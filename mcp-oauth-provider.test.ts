@@ -14,7 +14,8 @@ const TEST_DIR = join(tmpdir(), `mcp-oauth-test-${randomBytes(4).toString('hex')
 process.env.MCP_OAUTH_DIR = TEST_DIR
 
 import { McpOAuthProvider } from "./mcp-oauth-provider.js"
-import { saveAuthEntry } from "./mcp-auth.js"
+import { saveAuthEntry, updateOAuthState } from "./mcp-auth.js"
+import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js"
 import type { OAuthClientInformationFull, OAuthTokens } from "@modelcontextprotocol/sdk/shared/auth.js"
 
 describe("McpOAuthProvider", () => {
@@ -234,13 +235,29 @@ describe("McpOAuthProvider", () => {
   })
 
   describe("redirectToAuthorization", () => {
-    it("should call onRedirect with URL", async () => {
-      const provider = createProvider()
+    it("should call onRedirect with URL when a flow is in progress", async () => {
+      const provider = new McpOAuthProvider("redirect-with-state", serverUrl, {}, {
+        onRedirect: async (url) => {
+          redirectCaptured = url
+        },
+      })
+      await updateOAuthState("redirect-with-state", "state-abc")
       const testUrl = new URL("https://example.com/auth")
 
       await provider.redirectToAuthorization(testUrl)
 
       assert.strictEqual(redirectCaptured, testUrl)
+    })
+
+    it("should throw UnauthorizedError when no flow is in progress", async () => {
+      const provider = new McpOAuthProvider("redirect-no-state", serverUrl, {}, {
+        onRedirect: async () => {},
+      })
+
+      await assert.rejects(
+        async () => provider.redirectToAuthorization(new URL("https://example.com/auth")),
+        (err: unknown) => err instanceof UnauthorizedError && /Re-authentication required/.test((err as Error).message),
+      )
     })
   })
 
@@ -280,14 +297,14 @@ describe("McpOAuthProvider", () => {
       assert.strictEqual(state, "state-xyz-789")
     })
 
-    it("should throw when no state", async () => {
+    it("should throw UnauthorizedError when no state is saved", async () => {
       const provider = new McpOAuthProvider("state-test-throw", serverUrl, {}, {
         onRedirect: async () => {},
       })
 
       await assert.rejects(
         async () => provider.state(),
-        /No OAuth state saved/
+        (err: unknown) => err instanceof UnauthorizedError && /Re-authentication required/.test((err as Error).message),
       )
     })
   })
