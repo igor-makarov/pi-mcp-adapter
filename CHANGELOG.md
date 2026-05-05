@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ignored npm lockfiles and removed checked-in `package-lock.json` files.
 
 ### Fixed
+- Resolved `${VAR}` and `$env:VAR` placeholders in HTTP bearer tokens.
 - Honored MCP sampling `modelPreferences.hints` before falling back to the current/default model.
 
 ## [2.5.3] - 2026-05-01

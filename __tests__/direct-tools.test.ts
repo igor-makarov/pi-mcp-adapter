@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { buildProxyDescription, resolveDirectTools } from "../direct-tools.js";
-import { computeServerHash, type MetadataCache } from "../metadata-cache.js";
+import { computeServerHash, isServerCacheValid, type MetadataCache } from "../metadata-cache.js";
 import { buildToolMetadata } from "../tool-metadata.js";
 import type { McpConfig } from "../types.js";
 import { reconstructToolMetadata } from "../metadata-cache.js";
@@ -155,6 +155,36 @@ describe("metadata cache hashing", () => {
     expect(computeServerHash({ url: "https://example.test/mcp", auth: "bearer", bearerTokenEnv: "MCP_HASH_TOKEN" })).toBe(
       computeServerHash({ url: "https://example.test/mcp", auth: "bearer", bearerToken: "token-two", bearerTokenEnv: "MCP_HASH_TOKEN" }),
     );
+  });
+
+  it("hashes interpolated bearerToken values", () => {
+    process.env.MCP_HASH_TOKEN = "token-one";
+    const first = computeServerHash({ url: "https://example.test/mcp", auth: "bearer", bearerToken: "${MCP_HASH_TOKEN}" });
+
+    process.env.MCP_HASH_TOKEN = "token-two";
+    const second = computeServerHash({ url: "https://example.test/mcp", auth: "bearer", bearerToken: "${MCP_HASH_TOKEN}" });
+
+    expect(first).not.toBe(second);
+    expect(computeServerHash({ url: "https://example.test/mcp", auth: "bearer", bearerToken: "$env:MCP_HASH_TOKEN" })).toBe(
+      computeServerHash({ url: "https://example.test/mcp", auth: "bearer", bearerToken: "token-two" }),
+    );
+  });
+
+  it("invalidates cached metadata when an interpolated bearerToken env value changes", () => {
+    const definition = { url: "https://example.test/mcp", auth: "bearer" as const, bearerToken: "${MCP_HASH_TOKEN}" };
+    process.env.MCP_HASH_TOKEN = "token-one";
+    const entry = {
+      configHash: computeServerHash(definition),
+      cachedAt: Date.now(),
+      tools: [],
+      resources: [],
+    };
+
+    expect(isServerCacheValid(entry, definition)).toBe(true);
+
+    process.env.MCP_HASH_TOKEN = "token-two";
+
+    expect(isServerCacheValid(entry, definition)).toBe(false);
   });
 });
 

@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { homedir, platform } from "node:os";
 import { join } from "node:path";
-import type { McpConfig } from "./types.js";
+import type { McpConfig, ServerEntry } from "./types.js";
 
 async function execOpen(pi: ExtensionAPI, target: string, browser?: string) {
   const os = platform();
@@ -84,6 +84,13 @@ export function resolveConfigPath(value: string | undefined): string | undefined
     return join(homedir(), resolved.slice(2));
   }
   return resolved;
+}
+
+export function resolveBearerToken(definition: Pick<ServerEntry, "bearerToken" | "bearerTokenEnv">): string | undefined {
+  if (definition.bearerToken !== undefined) {
+    return interpolateEnvVars(definition.bearerToken);
+  }
+  return definition.bearerTokenEnv ? process.env[definition.bearerTokenEnv] : undefined;
 }
 
 export function truncateAtWord(text: string, target: number): string {

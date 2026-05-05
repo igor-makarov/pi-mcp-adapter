@@ -126,7 +126,7 @@ Pi-specific files are the write targets for imported or shared global servers wh
 | `headers` | HTTP headers; supports `${VAR}` and `$env:VAR` interpolation |
 | `auth` | `"bearer"` or `"oauth"` |
 | `oauth.grantType` | `"authorization_code"` (default) or `"client_credentials"` for non-interactive machine auth |
-| `bearerToken` / `bearerTokenEnv` | Token or env var name |
+| `bearerToken` / `bearerTokenEnv` | Token or env var name; `bearerToken` supports `${VAR}` and `$env:VAR` interpolation |
 | `lifecycle` | `"lazy"` (default), `"eager"`, or `"keep-alive"` |
 | `idleTimeout` | Minutes before idle disconnect (overrides global) |
 | `exposeResources` | Expose MCP resources as tools (default: true) |
