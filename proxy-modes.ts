@@ -369,7 +369,7 @@ export async function executeConnect(state: McpExtensionState, serverName: strin
 
   try {
     if (state.ui) {
-      state.ui.setStatus("mcp", `MCP: connecting to ${serverName}...`);
+      state.ui.setStatus("mcp", `🧩 MCP: connecting to ${serverName}...`);
     }
     const connection = await state.manager.connect(serverName, definition);
     const prefix = state.config.settings?.toolPrefix ?? "server";
@@ -494,7 +494,7 @@ export async function executeCall(
 
     try {
       if (state.ui) {
-        state.ui.setStatus("mcp", `MCP: connecting to ${serverName}...`);
+        state.ui.setStatus("mcp", `🧩 MCP: connecting to ${serverName}...`);
       }
       connection = await state.manager.connect(serverName, definition);
       state.failureTracker.delete(serverName);
